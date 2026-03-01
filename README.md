@@ -40,8 +40,8 @@ Execute a script and send results to a webhook.
 ```json
 {
   "script_name": "hello",
-  "output_webhook": "https://example.com/webhook",
-  "timeout": 300
+  "script_response_webhook": "https://example.com/webhook",
+  "script_timeout_seconds": 300
 }
 ```
 
@@ -54,7 +54,7 @@ Execute a script and send results to a webhook.
 }
 ```
 
-The script runs in the background. Results are sent to `output_webhook` when complete:
+The script runs in the background. Results are sent to `script_response_webhook` when complete:
 ```json
 {
   "stdout": "Hello from remote-runner!\nCurrent date: ...\n",

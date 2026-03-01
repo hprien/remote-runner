@@ -22,8 +22,8 @@ SCRIPT_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 class ScriptRequest(BaseModel):
     script_name: str
-    output_webhook: str
-    timeout: int
+    script_response_webhook: str
+    script_timeout_seconds: int
 
     @field_validator('script_name')
     @classmethod
@@ -32,11 +32,11 @@ class ScriptRequest(BaseModel):
             raise ValueError('script_name must contain only letters, numbers, dashes, and underscores')
         return v
 
-    @field_validator('timeout')
+    @field_validator('script_timeout_seconds')
     @classmethod
-    def validate_timeout(cls, v: int) -> int:
+    def validate_script_timeout_seconds(cls, v: int) -> int:
         if v <= 0:
-            raise ValueError('timeout must be positive')
+            raise ValueError('script_timeout_seconds must be positive')
         return v
 
 
@@ -107,7 +107,7 @@ def run_script(request: ScriptRequest, authorization: str = Header(None)):
         raise HTTPException(status_code=403, detail=f"Script '{request.script_name}' not found")
 
     # Start script in background thread
-    thread = threading.Thread(target=run_script_and_notify, args=(script_path, request.output_webhook, request.timeout))
+    thread = threading.Thread(target=run_script_and_notify, args=(script_path, request.script_response_webhook, request.script_timeout_seconds))
     thread.start()
 
     return ScriptResponse(
