@@ -4,20 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Remote-runner is a service that offers script execution via REST API. It provides a REST API through which clients can request script execution. The folder `scripts` contains a subfolder for each script. A executable file with the same name as the folder is supposed to be In every of these subfolders folders.
+refer to `README.md`
 
-## Architecture
+## code style
+- do not use broad exceptions. Only use tight and specific ones
+- check every user and api input carefully for unwanted or malicious content
+- define constants and don't just use unexplained values
+- don't repeat your self. If the same code occured multiple times, put it in a function and re use it.
 
-Key architectural considerations:
-- REST API - python fastapi
-- python backend runs with root permission
-- python backend executes scripts with root permission
-- the std out and err out and return code of the execution will be send to a webhook
-- .env file with port and api key
-
-## usage
-
-there is supposed to be one api route that take:
-- the script name (subfolder of `scripts`)
-- output_webhook (results will go here)
-- Authorization headeer with Bearer token
+## working principles
+- always consider to align `README.md` and `.gitignore`
