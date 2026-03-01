@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import threading
+from urllib.parse import urlparse
 import httpx
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel, field_validator
@@ -30,6 +31,16 @@ class ScriptRequest(BaseModel):
     def validate_script_name(cls, v: str) -> str:
         if not SCRIPT_NAME_PATTERN.match(v):
             raise ValueError('script_name must contain only letters, numbers, dashes, and underscores')
+        return v
+
+    @field_validator('script_response_webhook')
+    @classmethod
+    def validate_script_response_webhook(cls, v: str) -> str:
+        parsed = urlparse(v)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError('script_response_webhook must be a valid URL')
+        if parsed.scheme != 'https':
+            raise ValueError('script_response_webhook must use HTTPS protocol')
         return v
 
     @field_validator('script_timeout_seconds')
