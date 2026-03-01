@@ -15,6 +15,7 @@ SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
 API_KEY = os.getenv("API_KEY", "")
 PORT = int(os.getenv("PORT", "8000"))
 HOST = os.getenv("HOST", "127.0.0.1")
+WEBHOOK_TIMEOUT_SECONDS = 10
 
 SCRIPT_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
 
@@ -80,18 +81,18 @@ def run_script_and_notify(script_path: str, webhook_url: str, timeout: int):
 
         # Send results to webhook
         try:
-            httpx.post(webhook_url, json=response_data, timeout=10)
+            httpx.post(webhook_url, json=response_data, timeout=WEBHOOK_TIMEOUT_SECONDS)
         except Exception as webhook_error:
             print(f"Webhook delivery failed: {webhook_error}")
 
     except subprocess.TimeoutExpired:
         try:
-            httpx.post(webhook_url, json={"error": "Script execution timed out"}, timeout=10)
+            httpx.post(webhook_url, json={"error": "Script execution timed out"}, timeout=WEBHOOK_TIMEOUT_SECONDS)
         except:
             pass
     except Exception as e:
         try:
-            httpx.post(webhook_url, json={"error": str(e)}, timeout=10)
+            httpx.post(webhook_url, json={"error": str(e)}, timeout=WEBHOOK_TIMEOUT_SECONDS)
         except:
             pass
 
