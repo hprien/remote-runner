@@ -16,6 +16,7 @@ load_dotenv()
 # Configure audit logging to syslog
 audit_logger = logging.getLogger('audit')
 audit_logger.setLevel(logging.INFO)
+audit_logger.propagate = False
 syslog_handler = logging.handlers.SysLogHandler(address='/dev/log')
 syslog_handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
 audit_logger.addHandler(syslog_handler)
