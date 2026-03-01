@@ -3,13 +3,22 @@ import re
 import subprocess
 import threading
 import secrets
+import logging
+import logging.handlers
 from urllib.parse import urlparse
 import httpx
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
 from pydantic import BaseModel, field_validator
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure audit logging to syslog
+audit_logger = logging.getLogger('audit')
+audit_logger.setLevel(logging.INFO)
+syslog_handler = logging.handlers.SysLogHandler(address='/dev/log')
+syslog_handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
+audit_logger.addHandler(syslog_handler)
 
 app = FastAPI()
 
@@ -67,22 +76,27 @@ class ScriptResponse(BaseModel):
     message: str
 
 
-def verify_api_key(authorization: str = Header(None)):
+def verify_api_key(authorization: str = Header(None), client_ip: str = "unknown"):
     if not API_KEY:
+        audit_logger.error(f"API_KEY not configured - client_ip={client_ip}")
         raise HTTPException(status_code=500, detail="API_KEY not configured")
 
     if not authorization:
+        audit_logger.warning(f"Missing Authorization header - client_ip={client_ip}")
         raise HTTPException(status_code=401, detail="Missing Authorization header")
 
     if not authorization.startswith("Bearer "):
+        audit_logger.warning(f"Invalid Authorization header format - client_ip={client_ip}")
         raise HTTPException(status_code=401, detail="Invalid Authorization header")
 
     token = authorization[7:]  # Remove "Bearer " prefix
 
     # Constant-time comparison to prevent timing attacks
     if not secrets.compare_digest(token, API_KEY):
+        audit_logger.warning(f"Invalid API key - client_ip={client_ip}")
         raise HTTPException(status_code=401, detail="Invalid API key")
 
+    audit_logger.info(f"API key verified - client_ip={client_ip}")
     return token
 
 
@@ -123,14 +137,17 @@ def run_script_and_notify(script_path: str, webhook_url: str, timeout: int):
 
 
 @app.post("/run", response_model=ScriptResponse)
-def run_script(request: ScriptRequest, authorization: str = Header(None)):
+def run_script(request: ScriptRequest, authorization: str = Header(None), fastapi_request: Request = None):
     global active_scripts_count
 
-    verify_api_key(authorization)
+    client_ip = fastapi_request.client.host if fastapi_request else "unknown"
+
+    verify_api_key(authorization, client_ip)
 
     # Check concurrent execution limit
     with active_scripts_lock:
         if active_scripts_count >= MAX_CONCURRENT_SCRIPTS:
+            audit_logger.warning(f"Concurrent script limit reached - client_ip={client_ip}, active={active_scripts_count}, limit={MAX_CONCURRENT_SCRIPTS}")
             raise HTTPException(status_code=503, detail="concurrent running script limit reached, try again later")
         active_scripts_count += 1
 
@@ -138,10 +155,14 @@ def run_script(request: ScriptRequest, authorization: str = Header(None)):
         script_path = os.path.join(SCRIPTS_DIR, request.script_name, request.script_name)
 
         if not os.path.exists(script_path):
+            audit_logger.warning(f"Script not found - client_ip={client_ip}, script_name={request.script_name}")
             raise HTTPException(status_code=404, detail=f"Script '{request.script_name}' not found")
 
         if not os.access(script_path, os.X_OK):
+            audit_logger.error(f"Script not executable - client_ip={client_ip}, script_name={request.script_name}, path={script_path}")
             raise HTTPException(status_code=404, detail=f"Script '{request.script_name}' not found")
+
+        audit_logger.info(f"Script execution started - client_ip={client_ip}, script_name={request.script_name}, webhook={request.script_response_webhook}, timeout={request.script_timeout_seconds}")
 
         # Start script in background thread
         thread = threading.Thread(target=run_script_and_notify, args=(script_path, request.script_response_webhook, request.script_timeout_seconds))
