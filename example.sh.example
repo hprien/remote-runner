@@ -1,8 +1,16 @@
+#!/bin/bash
+# Example script for remote-runner
+# Copy this to example.sh and update the WEBHOOK_ID with your webhook.site ID
+
+WEBHOOK_ID="<your-webhook-site-id-here>"
+API_KEY="your-secret-api-key-here"
+
+# Trigger the remote-runner API
 curl -X POST http://127.0.0.1:8000/run \
--H "Authorization: Bearer your-secret-api-key-here" \
--H "Content-Type: application/json" \
--d '{                                                                                                                                                                                                                  
-      "script_name": "hello",
-      "script_response_webhook": "https://webhook.site/<id>",
-      "script_timeout_seconds": 60
-    }'
+  -H "Authorization: Bearer ${API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"script_name\": \"hello\",
+    \"script_response_webhook\": \"https://webhook.site/${WEBHOOK_ID}\",
+    \"script_timeout_seconds\": 60
+  }"

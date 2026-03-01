@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configure audit logging to syslog
-audit_logger = logging.getLogger('audit')
+audit_logger = logging.getLogger('remote-runner')
 audit_logger.setLevel(logging.INFO)
 audit_logger.propagate = False
 syslog_handler = logging.handlers.SysLogHandler(address='/dev/log')

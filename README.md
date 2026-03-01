@@ -63,6 +63,39 @@ The script runs in the background. Results are sent to `script_response_webhook`
 }
 ```
 
+## Testing with webhook.site
+
+1. Visit https://webhook.site and copy your unique ID
+2. Copy `example.sh.example` to `example.sh`:
+   ```bash
+   cp example.sh.example example.sh
+   ```
+3. Edit `example.sh` and replace `<your-webhook-site-id-here>` with your webhook.site ID
+4. Make it executable and run:
+   ```bash
+   chmod +x example.sh
+   ./example.sh
+   ```
+5. Check webhook.site to see the script execution results
+
+## Viewing Audit Logs
+
+Audit logs are sent to syslog and can be viewed with:
+
+```bash
+# View all remote-runner audit logs
+journalctl -t remote-runner
+
+# Follow logs in real-time
+journalctl -t remote-runner -f
+
+# View last 50 entries
+journalctl -t remote-runner -n 50
+
+# Logs from last hour
+journalctl -t remote-runner --since "1 hour ago"
+```
+
 ## Adding Scripts
 
 Place executable scripts in `scripts/<script_name>/<script_name>`. For example:
