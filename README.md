@@ -25,7 +25,7 @@ cp .env.example .env
 python main.py
 ```
 
-The server will start on `http://0.0.0.0:8000` (or the port specified in .env).
+The server will start on `http://127.0.0.1:8000` (or the host/port specified in .env).
 
 ## API
 
@@ -40,7 +40,8 @@ Execute a script and send results to a webhook.
 ```json
 {
   "script_name": "hello",
-  "output_webhook": "https://example.com/webhook"
+  "output_webhook": "https://example.com/webhook",
+  "timeout": 300
 }
 ```
 

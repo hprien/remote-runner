@@ -1,9 +1,10 @@
 import os
+import re
 import subprocess
 import threading
 import httpx
 from fastapi import FastAPI, HTTPException, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,11 +14,29 @@ app = FastAPI()
 SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "scripts")
 API_KEY = os.getenv("API_KEY", "")
 PORT = int(os.getenv("PORT", "8000"))
+HOST = os.getenv("HOST", "127.0.0.1")
+
+SCRIPT_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
 
 
 class ScriptRequest(BaseModel):
     script_name: str
     output_webhook: str
+    timeout: int
+
+    @field_validator('script_name')
+    @classmethod
+    def validate_script_name(cls, v: str) -> str:
+        if not SCRIPT_NAME_PATTERN.match(v):
+            raise ValueError('script_name must contain only letters, numbers, dashes, and underscores')
+        return v
+
+    @field_validator('timeout')
+    @classmethod
+    def validate_timeout(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError('timeout must be positive')
+        return v
 
 
 class ScriptResponse(BaseModel):
@@ -43,14 +62,14 @@ def verify_api_key(authorization: str = Header(None)):
     return token
 
 
-def run_script_and_notify(script_path: str, webhook_url: str):
+def run_script_and_notify(script_path: str, webhook_url: str, timeout: int):
     """Run script in background and notify webhook when done."""
     try:
         result = subprocess.run(
             [script_path],
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=timeout
         )
 
         response_data = {
@@ -90,7 +109,7 @@ def run_script(request: ScriptRequest, authorization: str = Header(None)):
         raise HTTPException(status_code=403, detail=f"Script '{request.script_name}' not found")
 
     # Start script in background thread
-    thread = threading.Thread(target=run_script_and_notify, args=(script_path, request.output_webhook))
+    thread = threading.Thread(target=run_script_and_notify, args=(script_path, request.output_webhook, request.timeout))
     thread.start()
 
     return ScriptResponse(
@@ -102,4 +121,4 @@ def run_script(request: ScriptRequest, authorization: str = Header(None)):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host=HOST, port=PORT)
