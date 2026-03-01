@@ -63,8 +63,17 @@ def verify_api_key(authorization: str = Header(None)):
     return token
 
 
+def call_webhook(webhook_url: str, content: dict):
+    try:
+        httpx.post(webhook_url, json=content, timeout=WEBHOOK_TIMEOUT_SECONDS)
+    except httpx.TimeoutException as e:
+        print(f"Webhook delivery timed out: {e}")
+    except httpx.ConnectError as e:
+        print(f"Webhook connection failed: {e}")
+
 def run_script_and_notify(script_path: str, webhook_url: str, timeout: int):
     """Run script in background and notify webhook when done."""
+
     try:
         result = subprocess.run(
             [script_path],
@@ -79,22 +88,10 @@ def run_script_and_notify(script_path: str, webhook_url: str, timeout: int):
             "return_code": result.returncode
         }
 
-        # Send results to webhook
-        try:
-            httpx.post(webhook_url, json=response_data, timeout=WEBHOOK_TIMEOUT_SECONDS)
-        except Exception as webhook_error:
-            print(f"Webhook delivery failed: {webhook_error}")
+        call_webhook(webhook_url, response_data)
 
     except subprocess.TimeoutExpired:
-        try:
-            httpx.post(webhook_url, json={"error": "Script execution timed out"}, timeout=WEBHOOK_TIMEOUT_SECONDS)
-        except:
-            pass
-    except Exception as e:
-        try:
-            httpx.post(webhook_url, json={"error": str(e)}, timeout=WEBHOOK_TIMEOUT_SECONDS)
-        except:
-            pass
+        call_webhook(webhook_url, {"error": "Script execution timed out"})
 
 
 @app.post("/run", response_model=ScriptResponse)
