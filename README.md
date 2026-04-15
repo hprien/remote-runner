@@ -5,24 +5,23 @@ Offers script execution via REST API.
 ## Setup
 
 ```bash
-# Create virtual environment
-python3 -m venv venv
-
-# Activate virtual environment
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
 # Configure environment
 cp .env.example .env
 # Edit .env with your API_KEY and PORT
+
+# Build Docker image
+docker build -t remote-runner .
 ```
 
 ## Running
 
 ```bash
-python main.py
+docker run -d \
+  --name remote-runner \
+  -p 8000:8000 \
+  -v $(pwd)/scripts:/app/scripts \
+  --env-file .env \
+  remote-runner
 ```
 
 The server will start on `http://127.0.0.1:8000` (or the host/port specified in .env).
