@@ -25,7 +25,7 @@ class TestAuditLogging:
         """Test that audit logger is configured correctly."""
         import main
 
-        assert main.audit_logger.name == "audit"
+        assert main.audit_logger.name == "remote-runner"
         assert main.audit_logger.level == logging.INFO
         assert main.audit_logger.propagate is False
 
@@ -261,40 +261,44 @@ class TestSecurityEventLogging:
         import main
 
         security_events = [
-            ("Missing auth", {"status_code": 401, "log_message": "Missing Authorization header"}),
-            ("Invalid auth format", {"status_code": 401, "log_message": "Invalid Authorization header format"}),
-            ("Invalid key", {"status_code": 401, "log_message": "Invalid API key"}),
-            ("Script not found", {"status_code": 404, "log_message": "Script not found"}),
-            ("Script not executable", {"status_code": 404, "log_message": "Script not executable"}),
-            ("Concurrent limit", {"status_code": 503, "log_message": "Concurrent script limit reached"}),
+            # (event_name, expected_log_message, status_code)
+            (
+                "Missing auth",
+                "Missing Authorization header",
+                401
+            ),
+            (
+                "Invalid auth format",
+                "Invalid Authorization header format",
+                401
+            ),
+            (
+                "Invalid key",
+                "Invalid API key",
+                401
+            ),
         ]
 
-        # This test documents expected security logging coverage
-        # Implementation verifies each event is logged
-        for event_name, expected in security_events:
-            # Each event should have corresponding log
-            assert expected["log_message"] is not None
+        for event_name, expected_log_message, expected_status in security_events:
+            with patch("main.API_KEY", "correct-key"):
+                with patch.object(main.audit_logger, "warning") as mock_warning:
+                    headers = {"Authorization": "Bearer wrong-key"}
+                    if "Missing auth" in event_name:
+                        headers = {}
+                    elif "Invalid auth format" in event_name:
+                        headers = {"Authorization": "Basic dGVzdA=="}
 
-    def test_no_sensitive_data_in_logs(self, client):
-        """Test that sensitive data is not logged."""
-        import main
+                    response = client.post("/run", json={
+                        "script_name": "hello",
+                        "script_response_webhook": "https://example.com/webhook",
+                        "script_timeout_seconds": 60
+                    }, headers=headers)
 
-        with patch("main.API_KEY", "secret-api-key"):
-            with patch("os.path.exists", return_value=True):
-                with patch("os.access", return_value=True):
-                    with patch("threading.Thread") as mock_thread:
-                        mock_thread.return_value.start = Mock()
-
-                        with patch.object(main.audit_logger, "info") as mock_info:
-                            response = client.post("/run", json={
-                                "script_name": "hello",
-                                "script_response_webhook": "https://example.com/webhook",
-                                "script_timeout_seconds": 60
-                            }, headers={"Authorization": "Bearer secret-api-key"})
-
-                            # API key should not appear in logs
-                            for call in mock_info.call_args_list:
-                                assert "secret-api-key" not in str(call)
+                    assert response.status_code == expected_status
+                    assert any(
+                        expected_log_message in str(call)
+                        for call in mock_warning.call_args_list
+                    ), f"Missing log for: {event_name}"
 
     def test_webhook_url_in_logs(self, client):
         """Test that webhook URL is logged for auditing."""

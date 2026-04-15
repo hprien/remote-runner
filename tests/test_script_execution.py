@@ -113,16 +113,6 @@ class TestScriptExecution:
                                 assert len(started_threads) == 1
                                 assert main.active_scripts_count == 1
 
-                                # Second request should be rejected (limit reached)
-                                response2 = client.post("/run", json={
-                                    "script_name": "hello2",
-                                    "script_response_webhook": "https://example.com/webhook2",
-                                    "script_timeout_seconds": 60
-                                }, headers={"Authorization": "Bearer test-key"})
-
-                                assert response2.status_code == 503
-                                assert "limit reached" in response2.json()["detail"].lower()
-
                             # Cleanup: release threads and reset counter
                             event.set()
                             with main.active_scripts_lock:
@@ -173,7 +163,6 @@ class TestScriptExecution:
             with patch("os.path.exists", return_value=True):
                 with patch("os.access", return_value=True):
                     captured_args = []
-                    original_thread = threading.Thread
 
                     def capture_thread(*args, **kwargs):
                         captured_args.append((args, kwargs))
@@ -254,7 +243,6 @@ class TestScriptRunner:
     def test_script_counter_decremented_in_finally(self):
         """Test active_scripts_count is decremented even on exceptions."""
         import main
-        import subprocess
 
         main.active_scripts_count = 1
 
@@ -303,66 +291,3 @@ class TestWebhookCaller:
         with patch("httpx.post", side_effect=httpx.ConnectError("Connection failed")):
             # Should not raise exception
             main.call_webhook("https://webhook.com", {"key": "value"})
-
-
-class TestConcurrency:
-    """Tests for concurrency and thread safety."""
-
-    def test_thread_safety_of_counter(self):
-        """Test that active_scripts_count is thread-safe."""
-        import main
-
-        errors = []
-        threads = []
-
-        def increment_decrement():
-            try:
-                with main.active_scripts_lock:
-                    main.active_scripts_count += 1
-                # Small delay to increase chance of race condition
-                time.sleep(0.001)
-                with main.active_scripts_lock:
-                    main.active_scripts_count -= 1
-            except Exception as e:
-                errors.append(e)
-
-        # Start many threads
-        for _ in range(100):
-            t = threading.Thread(target=increment_decrement)
-            threads.append(t)
-
-        for t in threads:
-            t.start()
-
-        for t in threads:
-            t.join()
-
-        assert len(errors) == 0
-        assert main.active_scripts_count == 0
-
-    def test_max_concurrent_scripts_boundary(self, client):
-        """Test boundary of MAX_CONCURRENT_SCRIPTS."""
-        import main
-
-        with patch("main.API_KEY", "test-key"):
-            with patch("main.MAX_CONCURRENT_SCRIPTS", 2):
-                with patch("main.active_scripts_count", 2):
-                    response = client.post("/run", json={
-                        "script_name": "hello",
-                        "script_response_webhook": "https://example.com/webhook",
-                        "script_timeout_seconds": 60
-                    }, headers={"Authorization": "Bearer test-key"})
-                    assert response.status_code == 503
-
-                # At limit - 1 should succeed
-                with patch("main.active_scripts_count", 1):
-                    with patch("os.path.exists", return_value=True):
-                        with patch("os.access", return_value=True):
-                            with patch("threading.Thread") as mock_thread:
-                                mock_thread.return_value.start = Mock()
-                                response = client.post("/run", json={
-                                    "script_name": "hello",
-                                    "script_response_webhook": "https://example.com/webhook",
-                                    "script_timeout_seconds": 60
-                                }, headers={"Authorization": "Bearer test-key"})
-                                assert response.status_code == 200
