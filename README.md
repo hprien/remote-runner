@@ -15,6 +15,7 @@ docker build -t remote-runner .
 
 ## Running
 
+Using Docker:
 ```bash
 docker run -d \
   --name remote-runner \
@@ -22,6 +23,11 @@ docker run -d \
   -v $(pwd)/scripts:/app/scripts \
   --env-file .env \
   remote-runner
+```
+
+Using Docker Compose:
+```bash
+docker compose up -d
 ```
 
 The server will start on `http://127.0.0.1:8000` (or the host/port specified in .env).
